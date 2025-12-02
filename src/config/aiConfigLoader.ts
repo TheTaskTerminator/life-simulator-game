@@ -36,12 +36,28 @@ export interface AIConfigFile {
   };
 }
 
+import { cacheManager } from '../utils/cacheUtils';
+import { STORAGE_KEYS, CACHE_CONFIG } from '../constants';
+
 let cachedConfig: AIConfigFile | null = null;
 
 /**
  * 加载 AI 配置文件
+ * 使用缓存机制，避免重复加载
  */
 export async function loadAIConfig(): Promise<AIConfigFile> {
+  // 先尝试从缓存获取
+  const cached = cacheManager.get<AIConfigFile>('ai-config', {
+    useLocalStorage: true,
+    keyPrefix: STORAGE_KEYS.CACHE_PREFIX,
+    ttl: CACHE_CONFIG.DATA_TTL,
+  });
+  if (cached) {
+    cachedConfig = cached;
+    return cached;
+  }
+
+  // 如果内存缓存存在，直接返回
   if (cachedConfig) {
     return cachedConfig;
   }
@@ -78,6 +94,14 @@ export async function loadAIConfig(): Promise<AIConfigFile> {
     }
     
     cachedConfig = configData;
+    
+    // 保存到缓存（24小时过期，持久化到 localStorage）
+    cacheManager.set('ai-config', configData, {
+      ttl: CACHE_CONFIG.DATA_TTL,
+      useLocalStorage: true,
+      keyPrefix: STORAGE_KEYS.CACHE_PREFIX,
+    });
+    
     return cachedConfig;
   } catch (error) {
     console.error('加载 AI 配置文件失败:', error);

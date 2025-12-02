@@ -144,6 +144,23 @@ export const INITIAL_ATTRIBUTE_RANGE = {
 export const STORAGE_KEYS = {
   SAVE: 'life-simulator-save',
   SETTINGS: 'life-simulator-settings',
+  CACHE_PREFIX: 'life-simulator-cache-',
+} as const;
+
+// 缓存配置
+export const CACHE_CONFIG = {
+  // AI 配置缓存时间（24小时）
+  AI_CONFIG_TTL: 24 * 60 * 60 * 1000,
+  // AI 事件缓存时间（1小时）
+  AI_EVENT_TTL: 60 * 60 * 1000,
+  // 事件缓存时间（30分钟）
+  EVENT_TTL: 30 * 60 * 1000,
+  // 其他数据缓存时间（24小时）
+  DATA_TTL: 24 * 60 * 60 * 1000,
+  // 游戏状态缓存（永不过期）
+  GAME_STATE_TTL: 0,
+  // 设置缓存（永不过期）
+  SETTINGS_TTL: 0,
 } as const;
 
 // 游戏版本

@@ -92,12 +92,20 @@ export default function GameView() {
   // 处理选择
   const handleChoice = useCallback(
     async (choice: Choice) => {
-      if (!player || !currentEvent) return;
+      if (!player || !currentEvent || isLoading) return;
 
-      eventHandlers.handleChoice(currentEvent, choice);
+      setIsLoading(true);
       setIsEventModalOpen(false);
+      try {
+        await eventHandlers.handleChoice(currentEvent, choice);
+      } catch (error) {
+        console.error('处理选择失败:', error);
+        addLog('system', '处理选择时发生错误，请重试');
+      } finally {
+        setIsLoading(false);
+      }
     },
-    [player, currentEvent, eventHandlers]
+    [player, currentEvent, eventHandlers, isLoading, addLog]
   );
 
   // 处理年龄增长

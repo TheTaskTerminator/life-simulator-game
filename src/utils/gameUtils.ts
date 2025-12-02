@@ -1,8 +1,10 @@
 import { Player, GameSave, LogEntry } from '../types';
 import { STORAGE_KEYS, GAME_VERSION } from '../constants';
+import { cacheManager, CACHE_KEYS } from './cacheUtils';
 
 /**
  * 保存游戏
+ * 同时保存到 localStorage 和缓存系统
  */
 export function saveGame(player: Player, logs: LogEntry[] = []): void {
   const save: GameSave = {
@@ -13,7 +15,15 @@ export function saveGame(player: Player, logs: LogEntry[] = []): void {
   };
 
   try {
+    // 保存到 localStorage（兼容旧版本）
     localStorage.setItem(STORAGE_KEYS.SAVE, JSON.stringify(save));
+    
+    // 同时保存到缓存系统（用于快速恢复）
+    cacheManager.set('game-save', save, {
+      ttl: 0, // 永不过期
+      useLocalStorage: true,
+      storageKey: CACHE_KEYS.GAME_STATE,
+    });
   } catch (error) {
     console.error('保存游戏失败:', error);
   }
@@ -21,13 +31,32 @@ export function saveGame(player: Player, logs: LogEntry[] = []): void {
 
 /**
  * 加载游戏
+ * 优先从缓存系统加载，如果不存在则从 localStorage 加载
  */
 export function loadGame(): GameSave | null {
   try {
+    // 先尝试从缓存系统加载
+    const cached = cacheManager.get<GameSave>(
+      'game-save',
+      CACHE_KEYS.GAME_STATE
+    );
+    if (cached) {
+      return cached;
+    }
+
+    // 从 localStorage 加载（兼容旧版本）
     const data = localStorage.getItem(STORAGE_KEYS.SAVE);
     if (!data) return null;
 
     const parsed = JSON.parse(data) as GameSave;
+    
+    // 恢复到缓存系统
+    cacheManager.set('game-save', parsed, {
+      ttl: 0, // 永不过期
+      useLocalStorage: true,
+      storageKey: CACHE_KEYS.GAME_STATE,
+    });
+    
     return parsed;
   } catch (error) {
     console.error('加载游戏失败:', error);
@@ -37,10 +66,15 @@ export function loadGame(): GameSave | null {
 
 /**
  * 清除存档
+ * 同时清除 localStorage 和缓存
  */
 export function clearSave(): void {
   try {
+    // 清除 localStorage
     localStorage.removeItem(STORAGE_KEYS.SAVE);
+    
+    // 清除缓存
+    cacheManager.delete('game-save', CACHE_KEYS.GAME_STATE);
   } catch (error) {
     console.error('清除存档失败:', error);
   }
