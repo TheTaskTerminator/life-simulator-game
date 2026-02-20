@@ -1,19 +1,16 @@
 import { Player, Event, EventType, EventEffect } from '../types';
 import { aiService } from './aiService';
 import { generateId } from '../utils/gameUtils';
+import { eventSelector } from '../engine/eventSelector';
 
 /**
  * 事件服务
- * 支持事件生成，每次生成不同的事件，并与年龄、属性关联
+ * 支持事件生成，基于标签冷却机制控制事件类型
  */
 export class EventService {
-  // 记录已触发的事件ID，避免短时间内重复
-  private recentEventIds = new Set<string>();
-  private readonly MAX_RECENT_EVENTS = 10;
-
-
   /**
-   * 生成事件（每次生成不同的事件）
+   * 生成事件
+   * 使用标签冷却机制而非文字签名去重
    */
   async generateEvent(
     player: Player,
@@ -25,47 +22,26 @@ export class EventService {
       return presetEvent;
     }
 
-    // 生成唯一的事件（不缓存，确保每次都是新的）
-    // 调用 AI 生成事件，每次都生成新的事件
+    // 如果指定了事件类型，检查是否可用
+    if (eventType && !eventSelector.isEventAvailable(player, eventType)) {
+      console.log(`事件类型 ${eventType} 处于冷却中，将选择其他类型`);
+      // 选择一个可用的类型
+      eventType = eventSelector.selectSmartEventType(player);
+    }
+
+    // 如果没有指定类型，智能选择
+    if (!eventType) {
+      eventType = eventSelector.selectSmartEventType(player);
+    }
+
+    // 调用 AI 生成事件
     try {
       const event = await aiService.generateEvent(player, eventType);
-      
-      // 检查是否与最近的事件重复（基于标题和描述）
-      const eventSignature = `${event.title}-${event.description.substring(0, 50)}`;
-      if (this.recentEventIds.has(eventSignature)) {
-        // 如果重复，重新生成（最多重试3次）
-        console.log('检测到重复事件，重新生成...');
-        for (let i = 0; i < 3; i++) {
-          const newEvent = await aiService.generateEvent(player, eventType);
-          const newSignature = `${newEvent.title}-${newEvent.description.substring(0, 50)}`;
-          if (!this.recentEventIds.has(newSignature)) {
-            this.addToRecentEvents(newSignature);
-            return newEvent;
-          }
-        }
-      }
-      
-      // 记录到最近事件列表
-      this.addToRecentEvents(eventSignature);
-      
       return event;
     } catch (error) {
       console.error('AI 生成事件失败:', error);
       // 返回降级事件
       return this.getFallbackEvent(player, eventType);
-    }
-  }
-
-  /**
-   * 添加到最近事件列表
-   */
-  private addToRecentEvents(eventSignature: string): void {
-    this.recentEventIds.add(eventSignature);
-    
-    // 限制最近事件数量
-    if (this.recentEventIds.size > this.MAX_RECENT_EVENTS) {
-      const firstEvent = Array.from(this.recentEventIds)[0];
-      this.recentEventIds.delete(firstEvent);
     }
   }
 

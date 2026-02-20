@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Player, Event, Choice, LogEntry } from '../types';
+import { Event, Choice, Player } from '../types';
 import { useGameState } from '../hooks/useGameState';
 import { useGameEffects } from '../hooks/useGameEffects';
-import { eventService } from '../services/eventService';
 import { stageService } from '../services/stageService';
 import { useEventHandlers } from './event';
 import { useCareerHandlers } from './career';
@@ -19,16 +18,23 @@ import RelationshipModal from '../components/RelationshipModal';
 import PropertyModal from '../components/PropertyModal';
 import AchievementModal from '../components/AchievementModal';
 import SettingsModal from '../components/SettingsModal';
+import EndingScreen from '../components/EndingScreen';
 
 export default function GameView() {
   const {
     player,
     setPlayer,
+    setPlayerAndCheckEnding,
     logs,
     addLog,
     ageUp,
+    gamePhase,
+    endingResult,
+    endingEvaluation,
+    resetGame,
   } = useGameState();
 
+  // 所有 hooks 必须在条件返回之前调用
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,31 +48,31 @@ export default function GameView() {
   const achievementModal = useModalState();
   const settingsModal = useModalState();
 
-  // 应用游戏副作用
+  // 应用游戏副作用 - 需要在条件返回之前调用
   useGameEffects(player, setPlayer);
 
-  // 使用各个模块的Handlers
+  // 使用各个模块的Handlers - 需要在条件返回之前调用
   const eventHandlers = useEventHandlers({
-    player,
-    setPlayer,
+    player: player!,
+    setPlayer: setPlayerAndCheckEnding as (player: Player | ((prev: Player) => Player)) => void,
     addLog,
   });
 
   const careerHandlers = useCareerHandlers({
-    player,
-    setPlayer,
+    player: player!,
+    setPlayer: setPlayer as (player: Player | ((prev: Player) => Player)) => void,
     addLog,
   });
 
   const educationHandlers = useEducationHandlers({
-    player,
-    setPlayer,
+    player: player!,
+    setPlayer: setPlayer as (player: Player | ((prev: Player) => Player)) => void,
     addLog,
   });
 
-  const relationshipHandlers = useRelationshipHandlers({
-    player,
-    setPlayer,
+  const _relationshipHandlers = useRelationshipHandlers({
+    player: player!,
+    setPlayer: setPlayer as (player: Player | ((prev: Player) => Player)) => void,
     addLog,
   });
 
@@ -136,22 +142,55 @@ export default function GameView() {
     }
   }, [player, isLoading, ageUp, addLog]);
 
+  // 条件返回放在所有 hooks 之后
+  // 如果游戏结束，显示结局界面
+  if (gamePhase === 'ended' && endingResult && endingEvaluation) {
+    return (
+      <EndingScreen
+        result={endingResult}
+        evaluation={endingEvaluation}
+        onRestart={resetGame}
+      />
+    );
+  }
+
+  // 如果没有玩家数据，返回 null
   if (!player) {
     return null;
   }
 
   return (
     <div className="game-view">
+      {/* 星空背景 */}
+      <div className="starfield">
+        {[...Array(60)].map((_, i) => (
+          <div
+            key={i}
+            className="star"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 3}s`,
+            }}
+          />
+        ))}
+      </div>
+
       <div className="game-container">
+        {/* 头部 */}
         <div className="game-header">
-          <h1>🌟 人生模拟器 🌟</h1>
+          <div className="header-title">
+            <span className="title-icon">☽</span>
+            <h1>命运之轮</h1>
+          </div>
           <div className="game-actions">
             <button
               onClick={handleTriggerEvent}
               disabled={isLoading}
               className="btn-primary"
             >
-              {isLoading ? '生成中...' : '触发事件'}
+              {isLoading ? '命运转动中...' : '触发事件'}
             </button>
             <button
               onClick={handleAgeUp}
@@ -160,6 +199,7 @@ export default function GameView() {
             >
               年龄 +1
             </button>
+            <div className="action-divider" />
             <button
               onClick={characterModal.open}
               className="btn-icon"
@@ -212,6 +252,7 @@ export default function GameView() {
           </div>
         </div>
 
+        {/* 主内容区 */}
         <div className="game-content">
           <div className="game-main">
             <StatsPanel player={player} />
@@ -284,65 +325,132 @@ export default function GameView() {
       <style>{`
         .game-view {
           min-height: 100vh;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0f0f2a 100%);
           padding: 20px;
+          position: relative;
+          font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        /* 星空背景 */
+        .starfield {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .star {
+          position: absolute;
+          width: 2px;
+          height: 2px;
+          background: white;
+          border-radius: 50%;
+          animation: twinkle 2s infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.5); }
         }
 
         .game-container {
+          position: relative;
+          z-index: 1;
           max-width: 1200px;
           margin: 0 auto;
         }
 
+        /* 头部 */
         .game-header {
-          background: white;
+          background: linear-gradient(160deg, rgba(20, 20, 35, 0.9) 0%, rgba(15, 15, 28, 0.95) 100%);
+          border: 1px solid rgba(212, 175, 55, 0.2);
           border-radius: 12px;
-          padding: 20px;
+          padding: 16px 24px;
           margin-bottom: 20px;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          box-shadow:
+            0 4px 20px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(212, 175, 55, 0.1);
         }
 
-        .game-header h1 {
+        .header-title {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .title-icon {
+          font-size: 24px;
+          color: #d4af37;
+          animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 1; }
+        }
+
+        .header-title h1 {
           margin: 0;
-          font-size: 1.8em;
-          color: #333;
+          font-family: 'Cinzel', serif;
+          font-size: 1.5em;
+          background: linear-gradient(180deg, #d4af37 0%, #f5d47e 50%, #d4af37 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          letter-spacing: 4px;
         }
 
         .game-actions {
           display: flex;
+          align-items: center;
           gap: 12px;
+        }
+
+        .action-divider {
+          width: 1px;
+          height: 32px;
+          background: rgba(212, 175, 55, 0.2);
+          margin: 0 4px;
         }
 
         .btn-primary,
         .btn-secondary {
-          padding: 12px 24px;
-          border: none;
+          padding: 10px 20px;
+          border: 1px solid rgba(212, 175, 55, 0.4);
           border-radius: 8px;
-          font-size: 16px;
-          font-weight: 600;
+          font-size: 14px;
+          font-weight: 500;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
+          font-family: 'Noto Sans SC', sans-serif;
         }
 
         .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+          background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(180, 140, 40, 0.15) 100%);
+          color: #d4af37;
         }
 
         .btn-primary:hover:not(:disabled) {
+          background: linear-gradient(135deg, rgba(212, 175, 55, 0.3) 0%, rgba(180, 140, 40, 0.25) 100%);
+          border-color: #d4af37;
+          box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
 
         .btn-secondary {
-          background: #f0f0f0;
-          color: #333;
+          background: rgba(255, 255, 255, 0.05);
+          color: #c0c0d0;
         }
 
         .btn-secondary:hover:not(:disabled) {
-          background: #e0e0e0;
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.3);
         }
 
         .btn-primary:disabled,
@@ -352,25 +460,31 @@ export default function GameView() {
         }
 
         .btn-icon {
-          padding: 12px;
-          border: none;
+          padding: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 8px;
-          font-size: 20px;
-          background: #f0f0f0;
-          color: #333;
+          font-size: 18px;
+          background: rgba(255, 255, 255, 0.03);
+          color: #c0c0d0;
           cursor: pointer;
-          transition: all 0.3s;
-          min-width: 48px;
+          transition: all 0.3s ease;
+          min-width: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .btn-icon:hover {
-          background: #e0e0e0;
+          background: rgba(212, 175, 55, 0.1);
+          border-color: rgba(212, 175, 55, 0.4);
+          color: #d4af37;
           transform: translateY(-2px);
         }
 
+        /* 内容区 */
         .game-content {
           display: grid;
-          grid-template-columns: 1fr 400px;
+          grid-template-columns: 1fr 380px;
           gap: 20px;
         }
 
@@ -391,8 +505,47 @@ export default function GameView() {
           flex-direction: column;
           gap: 20px;
         }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+          .game-header {
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+          }
+
+          .game-actions {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+
+          .action-divider {
+            display: none;
+          }
+
+          .header-title h1 {
+            font-size: 1.2em;
+          }
+        }
+
+        @media (max-width: 500px) {
+          .game-view {
+            padding: 12px;
+          }
+
+          .btn-primary,
+          .btn-secondary {
+            padding: 8px 16px;
+            font-size: 13px;
+          }
+
+          .btn-icon {
+            padding: 8px;
+            min-width: 40px;
+            font-size: 16px;
+          }
+        }
       `}</style>
     </div>
   );
 }
-

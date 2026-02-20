@@ -1,6 +1,14 @@
 import { Player, PlayerAttributes, EventEffect } from '../types';
 import { EducationLevel, CareerLevel } from '../types';
 import { CAREER_LEVEL_MULTIPLIERS } from '../constants';
+import { GAME_CONFIG } from '../config/gameConfig';
+
+/**
+ * 数值边界 clamp 工具函数
+ */
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
 
 /**
  * 计算教育加成
@@ -62,6 +70,7 @@ export function calculateAttributes(player: Player): PlayerAttributes {
 
 /**
  * 应用事件效果
+ * 使用 GameConfig 进行数值边界保护
  */
 export function applyEventEffects(
   player: Player,
@@ -70,22 +79,43 @@ export function applyEventEffects(
   const updated = { ...player };
   updated.attributes = { ...updated.attributes };
 
+  const bounds = GAME_CONFIG.parameters.metric_bounds;
+  const maxEffect = GAME_CONFIG.parameters.max_effect_value;
+
   effects.forEach((effect) => {
     if (effect.type === 'attribute' && effect.attribute) {
-      const currentValue = updated.attributes[effect.attribute];
-      updated.attributes[effect.attribute] = currentValue + effect.value;
+      const attrKey = effect.attribute;
+
+      // 1. 单次效果值 clamp（防止 AI 返回超大值）
+      let clampedValue = clamp(
+        effect.value,
+        -maxEffect.attribute,
+        maxEffect.attribute
+      );
+
+      // 2. 应用效果
+      const currentValue = updated.attributes[attrKey];
+      let newValue = currentValue + clampedValue;
+
+      // 3. 应用后 clamp 到边界
+      const bound = bounds[attrKey];
+      if (bound) {
+        newValue = clamp(newValue, bound.min, bound.max === Infinity ? Number.MAX_SAFE_INTEGER : bound.max);
+      }
+
+      updated.attributes[attrKey] = newValue;
     } else if (effect.type === 'wealth') {
-      updated.attributes.wealth += effect.value;
+      // 财富单独处理（无上限但有下限）
+      let clampedWealthValue = clamp(
+        effect.value,
+        -maxEffect.wealth,
+        maxEffect.wealth
+      );
+
+      const newWealth = updated.attributes.wealth + clampedWealthValue;
+      updated.attributes.wealth = Math.max(bounds.wealth.min, newWealth);
     }
   });
-
-  // 限制属性范围
-  updated.attributes.health = Math.max(0, Math.min(100, updated.attributes.health));
-  updated.attributes.intelligence = Math.max(0, Math.min(100, updated.attributes.intelligence));
-  updated.attributes.charm = Math.max(0, Math.min(100, updated.attributes.charm));
-  updated.attributes.happiness = Math.max(0, Math.min(100, updated.attributes.happiness));
-  updated.attributes.stress = Math.max(0, Math.min(100, updated.attributes.stress));
-  // 财富没有上限
 
   return updated;
 }

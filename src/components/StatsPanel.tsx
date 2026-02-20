@@ -8,14 +8,16 @@ interface StatsPanelProps {
 }
 
 // 数字滚动动画组件
-function AnimatedNumber({ 
-  value, 
-  suffix = '', 
-  duration = 800 
-}: { 
-  value: number; 
-  suffix?: string; 
+function AnimatedNumber({
+  value,
+  suffix = '',
+  duration = 800,
+  color,
+}: {
+  value: number;
+  suffix?: string;
   duration?: number;
+  color?: string;
 }) {
   const [displayValue, setDisplayValue] = useState(value);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -34,11 +36,11 @@ function AnimatedNumber({
         const now = Date.now();
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        
+
         // 使用缓动函数
         const easeOutCubic = 1 - Math.pow(1 - progress, 3);
         const currentValue = Math.round(startValue + (endValue - startValue) * easeOutCubic);
-        
+
         setDisplayValue(currentValue);
 
         if (progress < 1) {
@@ -61,7 +63,10 @@ function AnimatedNumber({
   }, [value, duration]);
 
   return (
-    <span className={`animated-number ${isAnimating ? 'animating' : ''}`}>
+    <span
+      className={`animated-number ${isAnimating ? 'animating' : ''}`}
+      style={isAnimating && color ? { color } : undefined}
+    >
       {suffix === '元' ? formatNumber(displayValue) : displayValue}{suffix}
     </span>
   );
@@ -77,7 +82,6 @@ export default function StatsPanel({ player }: StatsPanelProps) {
     const current = player.attributes;
     const changed: Set<keyof Player['attributes']> = new Set();
 
-    // 检查每个属性的变化
     (Object.keys(current) as Array<keyof Player['attributes']>).forEach((key) => {
       if (prev[key] !== current[key]) {
         changed.add(key);
@@ -85,15 +89,12 @@ export default function StatsPanel({ player }: StatsPanelProps) {
     });
 
     if (changed.size > 0) {
-      // 高亮变化的属性
       setHighlightedAttrs(changed);
-      
-      // 3秒后移除高亮
+
       const timer = setTimeout(() => {
         setHighlightedAttrs(new Set());
       }, 3000);
 
-      // 更新引用
       prevAttributesRef.current = { ...current };
 
       return () => clearTimeout(timer);
@@ -103,224 +104,307 @@ export default function StatsPanel({ player }: StatsPanelProps) {
   const statCards = [
     {
       key: 'health' as const,
-      label: '健康',
+      label: '生命力',
       value: player.attributes.health,
       max: 100,
-      color: '#4caf50',
+      color: '#4CAF50',
       icon: '💚',
-      hasBar: true,
+      isLow: player.attributes.health < 30,
     },
     {
       key: 'intelligence' as const,
-      label: '智力',
+      label: '智慧',
       value: player.attributes.intelligence,
       max: 100,
       color: '#2196f3',
-      icon: '🧠',
-      hasBar: true,
+      icon: '🔮',
+      isLow: player.attributes.intelligence < 30,
     },
     {
       key: 'charm' as const,
       label: '魅力',
       value: player.attributes.charm,
       max: 100,
-      color: '#e91e63',
+      color: '#E91E63',
       icon: '✨',
-      hasBar: true,
+      isLow: player.attributes.charm < 30,
     },
     {
       key: 'happiness' as const,
-      label: '幸福度',
+      label: '幸福感',
       value: player.attributes.happiness,
       max: 100,
-      color: '#ff9800',
-      icon: '😊',
-      hasBar: true,
+      color: '#FFD700',
+      icon: '🌟',
+      isLow: player.attributes.happiness < 30,
     },
     {
       key: 'stress' as const,
-      label: '压力',
+      label: '劫数',
       value: player.attributes.stress,
       max: 100,
-      color: '#f44336',
-      icon: '😰',
-      hasBar: true,
+      color: '#F44336',
+      icon: '⚡',
+      isLow: player.attributes.stress > 70, // 压力高是坏事
+      isInverted: true,
     },
     {
       key: 'wealth' as const,
       label: '财富',
       value: player.attributes.wealth,
       max: null,
-      color: '#4caf50',
+      color: '#d4af37',
       icon: '💰',
-      hasBar: false,
+      isLow: false,
     },
   ];
 
   return (
     <div className="stats-panel">
+      {/* 头部信息 */}
       <div className="stats-header">
-        <h2>{player.name}</h2>
-        <span className="age"><AnimatedNumber value={player.age} suffix=" 岁" /></span>
-        <span className="stage">{STAGE_NAMES[player.stage]}</span>
+        <div className="player-name">
+          <span className="name-icon">☽</span>
+          <h2>{player.name}</h2>
+        </div>
+        <div className="player-meta">
+          <span className="age-badge">
+            <AnimatedNumber value={player.age} suffix="岁" color="#d4af37" />
+          </span>
+          <span className="stage-badge">{STAGE_NAMES[player.stage]}</span>
+        </div>
       </div>
 
-      <div className="stats-cards-grid">
+      {/* 属性卡片网格 */}
+      <div className="stats-grid">
         {statCards.map((stat) => {
           const isHighlighted = highlightedAttrs.has(stat.key);
           return (
             <div
               key={stat.key}
-              className={`stat-card ${isHighlighted ? 'highlighted' : ''}`}
-              style={{ '--card-color': stat.color } as React.CSSProperties}
+              className={`stat-card ${isHighlighted ? 'highlighted' : ''} ${stat.isLow ? 'low-warning' : ''}`}
             >
-              <div className="stat-card-header">
+              <div className="stat-card-glow" style={{ borderColor: stat.color }} />
+
+              <div className="stat-header">
                 <span className="stat-icon">{stat.icon}</span>
                 <span className="stat-label">{stat.label}</span>
-          </div>
-              <div className="stat-card-body">
-                {stat.hasBar ? (
-                  <>
-          <div className="stat-bar">
-            <div
-                        className="stat-fill"
-                        style={{ 
+              </div>
+
+              {stat.max ? (
+                <>
+                  <div className="stat-bar-container">
+                    <div
+                      className="stat-bar"
+                      style={{ background: `rgba(255,255,255,0.1)` }}
+                    >
+                      <div
+                        className="stat-bar-fill"
+                        style={{
                           width: `${stat.value}%`,
-                          backgroundColor: stat.color
+                          background: `linear-gradient(90deg, ${stat.color}80, ${stat.color})`,
+                          boxShadow: `0 0 10px ${stat.color}60`,
                         }}
-            />
-          </div>
-                    <div className="stat-value">
-                      <AnimatedNumber value={stat.value} suffix="/100" />
-        </div>
-                  </>
-                ) : (
-                  <div className="stat-value-large">
-                    <AnimatedNumber value={stat.value} suffix="元" />
-          </div>
-                )}
-        </div>
-        </div>
+                      />
+                    </div>
+                    <span className="stat-value">
+                      <AnimatedNumber value={stat.value} color={stat.color} />
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="stat-value-large">
+                  <AnimatedNumber value={stat.value} suffix="元" color="#d4af37" />
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
 
+      {/* 信息区 */}
       <div className="stats-info">
-        <div className="info-item">
-          <span className="info-label">教育:</span>
+        <div className="info-row">
+          <span className="info-icon">🎓</span>
+          <span className="info-label">教育</span>
           <span className="info-value">{player.education || '无'}</span>
         </div>
-        <div className="info-item">
-          <span className="info-label">职业:</span>
+        <div className="info-row">
+          <span className="info-icon">💼</span>
+          <span className="info-label">职业</span>
           <span className="info-value">{player.career?.name || '无'}</span>
         </div>
-        <div className="info-item">
-          <span className="info-label">婚姻:</span>
+        <div className="info-row">
+          <span className="info-icon">💑</span>
+          <span className="info-label">婚姻</span>
           <span className="info-value">{player.maritalStatus || '单身'}</span>
         </div>
       </div>
 
       <style>{`
         .stats-panel {
-          background: white;
+          background: linear-gradient(145deg, rgba(20, 20, 35, 0.95) 0%, rgba(15, 15, 28, 0.98) 100%);
+          border: 1px solid rgba(212, 175, 55, 0.2);
           border-radius: 16px;
           padding: 24px;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(212, 175, 55, 0.1);
+          font-family: 'Noto Sans SC', sans-serif;
         }
 
+        /* 头部 */
         .stats-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+        }
+
+        .player-name {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin-bottom: 24px;
-          padding-bottom: 16px;
-          border-bottom: 2px solid #f0f0f0;
         }
 
-        .stats-header h2 {
+        .name-icon {
+          font-size: 20px;
+          color: #d4af37;
+          animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 1; }
+        }
+
+        .player-name h2 {
           margin: 0;
+          font-family: 'Cinzel', serif;
           font-size: 1.5em;
-          color: #333;
+          background: linear-gradient(180deg, #d4af37 0%, #f5d47e 50%, #d4af37 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          letter-spacing: 2px;
         }
 
-        .age {
-          background: #667eea;
-          color: white;
-          padding: 4px 12px;
-          border-radius: 12px;
+        .player-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .age-badge {
+          background: rgba(212, 175, 55, 0.15);
+          border: 1px solid rgba(212, 175, 55, 0.3);
+          padding: 6px 14px;
+          border-radius: 20px;
+          color: #d4af37;
           font-size: 14px;
           font-weight: 600;
         }
 
-        .stage {
-          background: #f0f0f0;
-          color: #666;
-          padding: 4px 12px;
-          border-radius: 12px;
-          font-size: 14px;
+        .stage-badge {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          padding: 6px 14px;
+          border-radius: 20px;
+          color: #8b8ba3;
+          font-size: 13px;
         }
 
-        .stats-cards-grid {
+        /* 属性网格 */
+        .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(2, 1fr);
           gap: 16px;
           margin-bottom: 24px;
         }
 
+        @media (max-width: 600px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
         .stat-card {
-          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-          border: 2px solid #e0e0e0;
+          position: relative;
+          background: linear-gradient(145deg, rgba(30, 30, 50, 0.6) 0%, rgba(20, 20, 35, 0.8) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 12px;
           padding: 16px;
           transition: all 0.3s ease;
-          position: relative;
           overflow: hidden;
         }
 
-        .stat-card::before {
-          content: '';
+        .stat-card-glow {
           position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 4px;
-          background: var(--card-color);
-          transform: scaleX(0);
-          transition: transform 0.3s ease;
+          top: -1px;
+          left: -1px;
+          right: -1px;
+          bottom: -1px;
+          border-radius: 12px;
+          border: 1px solid transparent;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
         }
 
         .stat-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-          border-color: var(--card-color);
+          transform: translateY(-2px);
+          border-color: rgba(212, 175, 55, 0.2);
         }
 
-        .stat-card:hover::before {
-          transform: scaleX(1);
+        .stat-card:hover .stat-card-glow {
+          opacity: 1;
         }
 
         .stat-card.highlighted {
-          background: linear-gradient(135deg, rgba(255, 235, 59, 0.1) 0%, rgba(255, 235, 59, 0.2) 100%);
-          border-color: #ffc107;
-          box-shadow: 0 0 20px rgba(255, 193, 7, 0.4);
-          animation: cardPulse 0.6s ease-in-out;
+          animation: cardHighlight 0.6s ease-out;
         }
 
-        .stat-card.highlighted::before {
-          background: #ffc107;
-          transform: scaleX(1);
+        .stat-card.highlighted .stat-card-glow {
+          opacity: 1;
+          animation: glowPulse 1.5s ease-out;
         }
 
-        @keyframes cardPulse {
-          0%, 100% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.05);
-          }
+        @keyframes cardHighlight {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
         }
 
-        .stat-card-header {
+        @keyframes glowPulse {
+          0% { opacity: 0.5; }
+          50% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+
+        /* 低值警告 */
+        .stat-card.low-warning {
+          animation: warningPulse 1.5s ease-in-out infinite;
+        }
+
+        .stat-card.low-warning .stat-card-glow {
+          border-color: #F44336;
+          opacity: 0.5;
+          animation: warningGlow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes warningPulse {
+          0%, 100% { box-shadow: 0 0 0 rgba(244, 67, 54, 0); }
+          50% { box-shadow: 0 0 20px rgba(244, 67, 54, 0.3); }
+        }
+
+        @keyframes warningGlow {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.8; }
+        }
+
+        .stat-header {
           display: flex;
           align-items: center;
           gap: 8px;
@@ -328,51 +412,63 @@ export default function StatsPanel({ player }: StatsPanelProps) {
         }
 
         .stat-icon {
-          font-size: 20px;
+          font-size: 18px;
         }
 
         .stat-label {
-          font-weight: 600;
-          color: #555;
-          font-size: 14px;
+          color: #8b8ba3;
+          font-size: 13px;
+          letter-spacing: 1px;
         }
 
-        .stat-card-body {
+        .stat-bar-container {
           display: flex;
-          flex-direction: column;
-          gap: 8px;
+          align-items: center;
+          gap: 12px;
         }
 
         .stat-bar {
-          width: 100%;
-          height: 8px;
-          background: #e0e0e0;
-          border-radius: 4px;
+          flex: 1;
+          height: 6px;
+          border-radius: 3px;
           overflow: hidden;
         }
 
-        .stat-fill {
+        .stat-bar-fill {
           height: 100%;
-          border-radius: 4px;
+          border-radius: 3px;
           transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
         }
 
-        .stat-card.highlighted .stat-fill {
-          box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+        .stat-bar-fill::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+          animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
 
         .stat-value {
-          font-size: 18px;
-          font-weight: 700;
-          color: #333;
+          min-width: 40px;
           text-align: right;
+          color: #f0f0f0;
+          font-weight: 600;
+          font-size: 15px;
         }
 
         .stat-value-large {
-          font-size: 24px;
-          font-weight: 700;
-          color: #4caf50;
           text-align: center;
+          font-size: 22px;
+          font-weight: 700;
           padding: 8px 0;
         }
 
@@ -382,31 +478,47 @@ export default function StatsPanel({ player }: StatsPanelProps) {
         }
 
         .animated-number.animating {
-          color: var(--card-color, #667eea);
-          transform: scale(1.1);
+          transform: scale(1.15);
+          text-shadow: 0 0 10px currentColor;
         }
 
+        /* 信息区 */
         .stats-info {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
           padding-top: 16px;
-          border-top: 2px solid #f0f0f0;
+          border-top: 1px solid rgba(212, 175, 55, 0.15);
         }
 
-        .info-item {
+        .info-row {
           display: flex;
-          justify-content: space-between;
-          font-size: 14px;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 12px;
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 8px;
+          transition: background 0.3s;
+        }
+
+        .info-row:hover {
+          background: rgba(212, 175, 55, 0.05);
+        }
+
+        .info-icon {
+          font-size: 16px;
         }
 
         .info-label {
           color: #666;
+          font-size: 13px;
+          min-width: 40px;
         }
 
         .info-value {
-          color: #333;
-          font-weight: 600;
+          color: #d4af37;
+          font-size: 13px;
+          font-weight: 500;
         }
       `}</style>
     </div>

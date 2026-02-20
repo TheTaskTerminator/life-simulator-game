@@ -185,10 +185,10 @@ export interface Player {
   name: string;
   age: number;
   stage: LifeStage;
-  
+
   // 核心属性
   attributes: PlayerAttributes;
-  
+
   // 状态信息
   education: EducationLevel;
   career: Career | null;
@@ -198,18 +198,22 @@ export interface Player {
   children: Person[];
   parents: Person[];
   friends: Person[];
-  
+
   // 资产
   properties: Property[];
   vehicles: Vehicle[];
   investments: Investment[];
-  
+
   // 游戏状态
   achievements: Achievement[];
   currentEvent: Event | null;
   eventHistory: Event[];
   choices: Choice[];
-  
+
+  // 回合系统
+  turn?: number;  // 当前回合
+  tagCooldowns?: Record<EventType, number>;  // 标签冷却
+
   // 元数据
   startDate: number;
   lastSaveDate: number;

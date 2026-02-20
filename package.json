@@ -11,9 +11,11 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "lucide-react": "^0.554.0"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -28,4 +30,3 @@
     "vite": "^6.2.0"
   }
 }
-

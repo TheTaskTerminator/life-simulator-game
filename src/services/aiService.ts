@@ -1,6 +1,8 @@
 import { getAIConfig, validateAIConfig } from '../config/aiConfig';
 import { getPromptConfig } from '../config/aiConfigLoader';
 import { Player, Event, EventType, Choice, EventEffect } from '../types';
+import { AIEventSchema, AIConsequenceSchema } from '../schemas';
+import { eventSelector } from '../engine/eventSelector';
 
 /**
  * AI 服务
@@ -99,6 +101,22 @@ export class AIService {
       widowed: '丧偶',
     };
 
+    // 获取可用标签
+    const availableTags = eventSelector.getAvailableTags(player);
+    const cooldownTags = eventSelector.getCooldownTags(player);
+
+    // 确定可用的事件类型
+    const availableTypes = eventType
+      ? [eventType]
+      : availableTags.length > 0
+        ? availableTags
+        : [EventType.DAILY];
+
+    // 冷却信息
+    const cooldownInfo = cooldownTags.length > 0
+      ? `\n- 以下类型处于冷却中：${cooldownTags.map(t => `${t.tag}(${t.remaining}回合)`).join('、')}`
+      : '';
+
     return `你是一个专业的人生模拟游戏AI事件生成器。请根据玩家的当前状态，生成一个真实、有趣、有代入感的人生事件。
 
 ## 玩家当前状态
@@ -118,7 +136,11 @@ ${player.partner ? `- **伴侣**: ${player.partner.name}` : ''}
 ${player.children.length > 0 ? `- **子女数量**: ${player.children.length}个` : ''}
 
 ## 事件类型要求
-${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（积极正面，可能带来收益）' : eventType === 'challenge' ? '挑战事件（需要应对困难）' : eventType === 'daily' ? '日常事件（普通生活场景）' : eventType === 'special' ? '特殊事件（罕见且重要）' : eventType === 'stage' ? '阶段事件（人生重要节点）' : eventType}` : '- 类型: 随机（根据玩家状态选择合适的类型）'}
+**重要约束**：
+- 本次事件类型必须是以下之一：${availableTypes.join('/')}
+- 其他类型处于冷却中，不能生成${cooldownInfo}
+
+${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（积极正面，可能带来收益）' : eventType === 'challenge' ? '挑战事件（需要应对困难）' : eventType === 'daily' ? '日常事件（普通生活场景）' : eventType === 'special' ? '特殊事件（罕见且重要）' : eventType === 'stage' ? '阶段事件（人生重要节点）' : eventType}` : `- 类型: 从可用类型中选择一个合适的类型`}
 
 ## 生成要求
 1. **年龄关联性**: 
@@ -245,6 +267,7 @@ ${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（�
 
   /**
    * 解析 AI 响应
+   * 使用 zod 进行 Schema 校验
    */
   private parseAIResponse(
     response: string,
@@ -262,6 +285,14 @@ ${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（�
 
       const parsed = JSON.parse(jsonStr);
 
+      // 使用 zod 校验
+      const validationResult = AIEventSchema.safeParse(parsed);
+
+      if (!validationResult.success) {
+        console.warn('AI 响应校验失败:', validationResult.error.issues);
+        // 尝试修复常见问题后继续
+      }
+
       // 转换为 Event 格式
       const event: Event = {
         id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -274,6 +305,7 @@ ${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（�
           effects: Object.entries(choice.effects || {}).map(([key, value]) => ({
             type: 'attribute' as const,
             attribute: key as keyof typeof player.attributes,
+            // 数值会被 attributeUtils.applyEventEffects 再次 clamp
             value: Number(value) || 0,
           })),
         })),
@@ -391,6 +423,7 @@ ${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（�
 
   /**
    * 解析后果响应
+   * 使用 zod 进行 Schema 校验
    */
   private parseConsequenceResponse(
     response: string,
@@ -407,10 +440,18 @@ ${eventType ? `- 指定类型: ${eventType === 'opportunity' ? '机遇事件（�
 
       const parsed = JSON.parse(jsonStr);
 
+      // 使用 zod 校验
+      const validationResult = AIConsequenceSchema.safeParse(parsed);
+
+      if (!validationResult.success) {
+        console.warn('后果响应校验失败:', validationResult.error.issues);
+        // 继续处理，但记录警告
+      }
+
       // 解析效果（支持新格式effects和旧格式additionalEffects以保持兼容）
       const effects: EventEffect[] = [];
       const effectsArray = parsed.effects || parsed.additionalEffects || [];
-      
+
       if (Array.isArray(effectsArray)) {
         effectsArray.forEach((effect: any) => {
           if (effect.type === 'attribute' && effect.attribute) {
