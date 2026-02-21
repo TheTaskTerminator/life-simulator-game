@@ -1,18 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGameState } from './hooks/useGameState';
+import { TopicProvider, getTopic, getDefaultTopic } from './core';
 import StartScreen from './components/StartScreen';
 import GameView from './views/GameView';
+import TopicSelector from './components/TopicSelector';
+import { TopicPackage } from './core/types/base';
+
+// 存储选中的话题 ID
+const TOPIC_STORAGE_KEY = 'life-simulator-topic';
 
 function App() {
   const { player, gameStarted, createNewGame, resetGame } = useGameState();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [topicPackage, setTopicPackage] = useState<TopicPackage | null>(null);
 
-  // 等待初始状态加载完成
-  // 由于 loadGame 是同步的，但为了确保 React 状态更新完成，使用 useEffect
+  // 初始化：从 localStorage 恢复话题选择
   useEffect(() => {
-    // 标记已初始化，允许根据实际状态决定显示什么
+    const savedTopicId = localStorage.getItem(TOPIC_STORAGE_KEY);
+    if (savedTopicId) {
+      try {
+        const topic = getTopic(savedTopicId);
+        setSelectedTopicId(savedTopicId);
+        setTopicPackage(topic);
+      } catch {
+        // 如果保存的话题不存在，使用默认话题
+        const defaultTopic = getDefaultTopic();
+        setSelectedTopicId(defaultTopic.config.id);
+        setTopicPackage(defaultTopic);
+      }
+    }
     setIsInitialized(true);
   }, []);
+
+  // 选择话题
+  const handleSelectTopic = useCallback((topicId: string) => {
+    const topic = getTopic(topicId);
+    setSelectedTopicId(topicId);
+    setTopicPackage(topic);
+    localStorage.setItem(TOPIC_STORAGE_KEY, topicId);
+  }, []);
+
+  // 切换话题（返回选择界面）
+  const handleChangeTopic = useCallback(() => {
+    setSelectedTopicId(null);
+    setTopicPackage(null);
+    localStorage.removeItem(TOPIC_STORAGE_KEY);
+    resetGame();
+  }, [resetGame]);
 
   const handleCreateGame = (name: string, attributes: any) => {
     createNewGame(name, attributes);
@@ -22,8 +57,7 @@ function App() {
     resetGame();
   };
 
-  // 如果还没有初始化完成，显示加载提示
-  // 这样可以避免在加载缓存时闪烁显示开始界面
+  // 加载中
   if (!isInitialized) {
     return (
       <div style={{
@@ -39,34 +73,53 @@ function App() {
     );
   }
 
-  // 如果有玩家数据且游戏已开始，直接进入游戏
-  // 否则显示开始界面
-  if (player && gameStarted) {
-  return (
-    <>
-      <GameView />
-      <div style={{ position: 'fixed', bottom: 20, right: 20 }}>
-        <button
-          onClick={handleReset}
-          style={{
-            padding: '10px 20px',
-            background: '#f44336',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
-        >
-          重置游戏
-        </button>
-      </div>
-    </>
-  );
+  // 显示话题选择界面
+  if (!selectedTopicId || !topicPackage) {
+    return <TopicSelector onSelectTopic={handleSelectTopic} />;
   }
 
-  return <StartScreen onCreateGame={handleCreateGame} />;
+  // 使用 TopicProvider 包裹游戏内容
+  return (
+    <TopicProvider topic={topicPackage}>
+      {player && gameStarted ? (
+        <>
+          <GameView />
+          <div style={{ position: 'fixed', bottom: 20, right: 20, display: 'flex', gap: '10px' }}>
+            <button
+              onClick={handleChangeTopic}
+              style={{
+                padding: '10px 20px',
+                background: '#2196f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              切换模拟器
+            </button>
+            <button
+              onClick={handleReset}
+              style={{
+                padding: '10px 20px',
+                background: '#f44336',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              重置游戏
+            </button>
+          </div>
+        </>
+      ) : (
+        <StartScreen onCreateGame={handleCreateGame} />
+      )}
+    </TopicProvider>
+  );
 }
 
 export default App;
-
