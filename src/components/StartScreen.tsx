@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Player } from '../types';
 import { generateRandomAttributes } from '../utils/attributeUtils';
+import { useTexts } from '../core/context/TopicContext';
 
 interface StartScreenProps {
   onCreateGame: (name: string, attributes: Player['attributes']) => void;
+  onBack?: () => void;
 }
 
-export default function StartScreen({ onCreateGame }: StartScreenProps) {
+export default function StartScreen({ onCreateGame, onBack }: StartScreenProps) {
+  const texts = useTexts();
   const [name, setName] = useState('');
   const [attributes, setAttributes] = useState(generateRandomAttributes());
   const [isRolling, setIsRolling] = useState(false);
   const [showCard, setShowCard] = useState(false);
+
+  // 动态文案
+  const gameTitle = texts.gameTitle || '命运之轮';
+  const subtitle = texts.gameSubtitle || '抽取你的命运牌，开启人生之旅';
+  const startButton = texts.startButton || '开启命运之门';
 
   // 属性配置
   const attributeConfig = [
@@ -69,11 +77,18 @@ export default function StartScreen({ onCreateGame }: StartScreenProps) {
       </div>
 
       <div className="start-container">
+        {/* 返回按钮 */}
+        {onBack && (
+          <button onClick={onBack} className="btn-back">
+            ← 返回选择模拟器
+          </button>
+        )}
+
         {/* 标题区域 */}
         <div className="title-section">
           <div className="mystical-symbol">☽ ☉ ☾</div>
-          <h1 className="game-title">命 运 之 轮</h1>
-          <p className="subtitle">抽取你的命运牌，开启人生之旅</p>
+          <h1 className="game-title">{gameTitle}</h1>
+          <p className="subtitle">{subtitle}</p>
         </div>
 
         {/* 命运之门输入 */}
@@ -162,7 +177,7 @@ export default function StartScreen({ onCreateGame }: StartScreenProps) {
           className="btn-enter-fate"
           disabled={!name.trim() || isRolling}
         >
-          <span className="btn-text">开启命运之门</span>
+          <span className="btn-text">{startButton}</span>
           <span className="btn-glow" />
         </button>
       </div>
@@ -214,6 +229,28 @@ export default function StartScreen({ onCreateGame }: StartScreenProps) {
           max-width: 700px;
           width: 100%;
           padding: 40px;
+        }
+
+        /* 返回按钮 */
+        .btn-back {
+          position: absolute;
+          top: 0;
+          left: 0;
+          padding: 10px 20px;
+          background: transparent;
+          border: 1px solid rgba(212, 175, 55, 0.3);
+          border-radius: 6px;
+          color: #a0a0a0;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        .btn-back:hover {
+          background: rgba(212, 175, 55, 0.1);
+          border-color: #d4af37;
+          color: #d4af37;
         }
 
         /* 标题区域 */

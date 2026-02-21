@@ -7,3 +7,4 @@ export { Modal, type ModalProps } from './Modal';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { Card, type CardProps } from './Card';
 export { Typography, type TypographyProps } from './Typography';
+export { DynamicStatsPanel, type DynamicStatsPanelProps } from './DynamicStatsPanel';

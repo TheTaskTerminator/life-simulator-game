@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Player, LogEntry, GameSettings } from '../types';
 import { LifeStage, MaritalStatus, EducationLevel, CareerLevel } from '../types';
-import { loadGame, saveGame, generateId } from '../utils/gameUtils';
+import { generateId, hasGameSave, loadGameForTopic, saveGameForTopic, clearSaveForTopic } from '../utils/gameUtils';
 import { generateRandomAttributes } from '../utils/attributeUtils';
 import { getCurrentStage } from '../utils/stageUtils';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../constants';
@@ -18,12 +18,14 @@ export type GamePhase = 'start' | 'playing' | 'ended';
 
 /**
  * 游戏状态管理 Hook
+ * @param topicId 话题ID，用于存档隔离
  */
-export function useGameState() {
+export function useGameState(topicId?: string) {
   const [player, setPlayer] = useState<Player | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
+  const [currentTopicId, setCurrentTopicId] = useState<string | null>(topicId || null);
 
   // 结局相关状态
   const [gamePhase, setGamePhase] = useState<GamePhase>('start');
@@ -31,17 +33,15 @@ export function useGameState() {
   const [endingResult, setEndingResult] = useState<EndingResult | null>(null);
   const [endingEvaluation, setEndingEvaluation] = useState<EndingEvaluation | null>(null);
 
-  // 加载存档和设置
+  // 更新话题ID
   useEffect(() => {
-    // 加载游戏存档
-    const saved = loadGame();
-    if (saved) {
-      setPlayer(saved.player);
-      setLogs(saved.logs || []);
-      setGameStarted(true);
+    if (topicId && topicId !== currentTopicId) {
+      setCurrentTopicId(topicId);
     }
+  }, [topicId, currentTopicId]);
 
-    // 加载设置（从缓存）
+  // 加载设置
+  useEffect(() => {
     const cachedSettings = cacheManager.get<GameSettings>(
       'game-settings',
       CACHE_KEYS.SETTINGS
@@ -49,15 +49,13 @@ export function useGameState() {
     if (cachedSettings) {
       setSettings(cachedSettings);
     } else {
-      // 尝试从 localStorage 加载旧格式的设置
       try {
         const oldSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
         if (oldSettings) {
           const parsed = JSON.parse(oldSettings);
           setSettings(parsed);
-          // 迁移到新的缓存系统
           cacheManager.set('game-settings', parsed, {
-            ttl: 0, // 永不过期
+            ttl: 0,
             useLocalStorage: true,
             storageKey: CACHE_KEYS.SETTINGS,
           });
@@ -68,25 +66,18 @@ export function useGameState() {
     }
   }, []);
 
-  // 自动保存游戏状态
+  // 自动保存游戏状态（按话题ID隔离）
   useEffect(() => {
-    if (player && gameStarted && settings.autoSave) {
-      saveGame(player, logs);
-      
-      // 同时缓存到缓存系统（用于快速恢复）
-      cacheManager.set('game-state', { player, logs }, {
-        ttl: 0, // 永不过期
-        useLocalStorage: true,
-        storageKey: CACHE_KEYS.GAME_STATE,
-      });
+    if (player && gameStarted && settings.autoSave && currentTopicId) {
+      saveGameForTopic(currentTopicId, player, logs);
     }
-  }, [player, logs, gameStarted, settings.autoSave]);
+  }, [player, logs, gameStarted, settings.autoSave, currentTopicId]);
 
   // 自动保存设置
   useEffect(() => {
     if (settings) {
       cacheManager.set('game-settings', settings, {
-        ttl: 0, // 永不过期
+        ttl: 0,
         useLocalStorage: true,
         storageKey: CACHE_KEYS.SETTINGS,
       });
@@ -98,7 +89,6 @@ export function useGameState() {
    */
   const createNewGame = useCallback(
     (name: string, attributes?: Player['attributes']) => {
-      // 初始化标签冷却
       const tagCooldowns = turnEngine.initTagCooldowns();
 
       const newPlayer: Player = {
@@ -135,7 +125,7 @@ export function useGameState() {
       setEnding(null);
       setEndingResult(null);
       setEndingEvaluation(null);
-      addLog('system', `欢迎来到人生模拟器，${name}！`);
+      // 欢迎消息由调用方添加，以便使用正确的话题名称
     },
     []
   );
@@ -159,17 +149,13 @@ export function useGameState() {
 
   /**
    * 更新玩家
-   * 支持两种形式：
-   * 1. 直接传入 Partial<Player>
-   * 2. 传入函数 (prev: Player) => Player
    */
   const updatePlayer = useCallback((
     updates: Partial<Player> | ((prev: Player | null) => Player | null)
   ) => {
     setPlayer((prev) => {
       if (!prev) return null;
-      
-      // 如果是函数，直接调用
+
       if (typeof updates === 'function') {
         const result = updates(prev);
         if (result) {
@@ -177,8 +163,7 @@ export function useGameState() {
         }
         return result;
       }
-      
-      // 否则合并更新
+
       const updated = { ...prev, ...updates };
       updated.lastSaveDate = Date.now();
       return updated;
@@ -187,7 +172,6 @@ export function useGameState() {
 
   /**
    * 年龄增长
-   * @returns 自动升学信息，如果没有升学则返回 null
    */
   const ageUp = useCallback((): AutoEducationResult | null => {
     if (!player) return null;
@@ -195,32 +179,26 @@ export function useGameState() {
     const newAge = player.age + 1;
     const newStage = getCurrentStage(newAge);
 
-    // 检查自动升学
     const tempPlayer = { ...player, age: newAge, stage: newStage };
     const educationResult = educationService.checkAutoEducationUpgrade(tempPlayer);
 
-    // 构建更新数据
     const updates: Partial<Player> = {
       age: newAge,
       stage: newStage,
-      manualEventTriggersThisYear: 0, // 重置手动触发计数
+      manualEventTriggersThisYear: 0,
     };
 
-    // 如果需要自动升学
     if (educationResult?.upgraded && educationResult.newLevel) {
       updates.education = educationResult.newLevel;
     }
 
     updatePlayer(updates);
-
     addLog('system', `你迎来了 ${newAge} 岁生日！`);
 
-    // 记录升学日志
     if (educationResult?.upgraded && educationResult.message) {
       addLog('system', educationResult.message);
     }
 
-    // 检查硬结局
     checkAndHandleEnding();
 
     return educationResult;
@@ -232,14 +210,12 @@ export function useGameState() {
   const checkAndHandleEnding = useCallback(() => {
     if (!player || gamePhase === 'ended') return;
 
-    // 检查硬结局
     const hardEnding = endingEngine.checkHardEnding(player);
     if (hardEnding) {
       endGame(hardEnding);
       return;
     }
 
-    // 检查回合上限
     const currentTurn = player.turn ?? 0;
     if (currentTurn >= 100) {
       const softEnding = endingEngine.evaluateSoftEnding(player);
@@ -265,9 +241,10 @@ export function useGameState() {
   }, [player, addLog]);
 
   /**
-   * 重置游戏
+   * 重置游戏（清除当前话题的存档）
    */
   const resetGame = useCallback(() => {
+    // 清除 React 状态
     setPlayer(null);
     setGameStarted(false);
     setLogs([]);
@@ -275,6 +252,34 @@ export function useGameState() {
     setEnding(null);
     setEndingResult(null);
     setEndingEvaluation(null);
+
+    // 清除当前话题的存档
+    if (currentTopicId) {
+      clearSaveForTopic(currentTopicId);
+    }
+  }, [currentTopicId]);
+
+  /**
+   * 检测是否有保存的游戏（按话题ID）
+   */
+  const checkHasSavedGame = useCallback((tid: string): boolean => {
+    return hasGameSave(tid);
+  }, []);
+
+  /**
+   * 加载保存的游戏（按话题ID）
+   */
+  const loadSavedGameForTopic = useCallback((tid: string): boolean => {
+    const saved = loadGameForTopic(tid);
+    if (saved) {
+      setPlayer(saved.player);
+      setLogs(saved.logs || []);
+      setGameStarted(true);
+      setGamePhase('playing');
+      setCurrentTopicId(tid);
+      return true;
+    }
+    return false;
   }, []);
 
   /**
@@ -305,10 +310,8 @@ export function useGameState() {
       }
       updated.lastSaveDate = Date.now();
 
-      // 检查硬结局
       const hardEnding = endingEngine.checkHardEnding(updated);
       if (hardEnding) {
-        // 异步处理结局，避免在 setState 中调用 setState
         setTimeout(() => {
           const result = endingEngine.generateEndingResult(updated, hardEnding);
           const evaluation = endingEngine.evaluatePlayer(updated);
@@ -337,6 +340,10 @@ export function useGameState() {
     ageUp,
     resetGame,
     incrementManualTrigger,
+    // 存档相关（按话题ID）
+    hasSavedGame: checkHasSavedGame,
+    loadSavedGame: loadSavedGameForTopic,
+    currentTopicId,
     // 结局相关
     gamePhase,
     ending,
@@ -345,4 +352,3 @@ export function useGameState() {
     checkAndHandleEnding,
   };
 }
-
