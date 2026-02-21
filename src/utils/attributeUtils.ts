@@ -15,10 +15,12 @@ function clamp(value: number, min: number, max: number): number {
  */
 function getEducationBonus(education: EducationLevel): Partial<PlayerAttributes> {
   const bonuses: Record<EducationLevel, Partial<PlayerAttributes>> = {
-    [EducationLevel.PRIMARY]: { intelligence: 0 },
-    [EducationLevel.MIDDLE]: { intelligence: 5 },
-    [EducationLevel.HIGH]: { intelligence: 10 },
-    [EducationLevel.BACHELOR]: { intelligence: 20 },
+    [EducationLevel.NONE]: { intelligence: 0 },
+    [EducationLevel.PRIMARY]: { intelligence: 5 },
+    [EducationLevel.MIDDLE]: { intelligence: 10 },
+    [EducationLevel.HIGH]: { intelligence: 15 },
+    [EducationLevel.COLLEGE]: { intelligence: 18 },
+    [EducationLevel.BACHELOR]: { intelligence: 22 },
     [EducationLevel.MASTER]: { intelligence: 30 },
     [EducationLevel.DOCTOR]: { intelligence: 40 },
   };

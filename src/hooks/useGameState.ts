@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../constants';
 import { cacheManager, CACHE_KEYS } from '../utils/cacheUtils';
 import { endingEngine } from '../engine/endingEngine';
 import { turnEngine } from '../engine/turnEngine';
+import { educationService, AutoEducationResult } from '../services/educationService';
 import type { Ending, EndingResult, EndingEvaluation } from '../types/ending';
 
 /**
@@ -105,7 +106,7 @@ export function useGameState() {
         age: 0,
         stage: LifeStage.CHILDHOOD,
         attributes: attributes || generateRandomAttributes(),
-        education: EducationLevel.PRIMARY,
+        education: EducationLevel.NONE,
         career: null,
         careerLevel: CareerLevel.ENTRY,
         maritalStatus: MaritalStatus.SINGLE,
@@ -122,6 +123,7 @@ export function useGameState() {
         choices: [],
         turn: 0,
         tagCooldowns,
+        manualEventTriggersThisYear: 0,
         startDate: Date.now(),
         lastSaveDate: Date.now(),
       };
@@ -185,22 +187,43 @@ export function useGameState() {
 
   /**
    * 年龄增长
+   * @returns 自动升学信息，如果没有升学则返回 null
    */
-  const ageUp = useCallback(() => {
-    if (!player) return;
+  const ageUp = useCallback((): AutoEducationResult | null => {
+    if (!player) return null;
 
     const newAge = player.age + 1;
     const newStage = getCurrentStage(newAge);
 
-    updatePlayer({
+    // 检查自动升学
+    const tempPlayer = { ...player, age: newAge, stage: newStage };
+    const educationResult = educationService.checkAutoEducationUpgrade(tempPlayer);
+
+    // 构建更新数据
+    const updates: Partial<Player> = {
       age: newAge,
       stage: newStage,
-    });
+      manualEventTriggersThisYear: 0, // 重置手动触发计数
+    };
+
+    // 如果需要自动升学
+    if (educationResult?.upgraded && educationResult.newLevel) {
+      updates.education = educationResult.newLevel;
+    }
+
+    updatePlayer(updates);
 
     addLog('system', `你迎来了 ${newAge} 岁生日！`);
 
+    // 记录升学日志
+    if (educationResult?.upgraded && educationResult.message) {
+      addLog('system', educationResult.message);
+    }
+
     // 检查硬结局
     checkAndHandleEnding();
+
+    return educationResult;
   }, [player, updatePlayer, addLog]);
 
   /**
@@ -255,6 +278,17 @@ export function useGameState() {
   }, []);
 
   /**
+   * 增加手动触发事件次数
+   */
+  const incrementManualTrigger = useCallback(() => {
+    if (!player) return;
+    const currentCount = player.manualEventTriggersThisYear ?? 0;
+    updatePlayer({
+      manualEventTriggersThisYear: currentCount + 1,
+    });
+  }, [player, updatePlayer]);
+
+  /**
    * 更新玩家并检查结局
    */
   const updatePlayerAndCheckEnding = useCallback((
@@ -302,6 +336,7 @@ export function useGameState() {
     createNewGame,
     ageUp,
     resetGame,
+    incrementManualTrigger,
     // 结局相关
     gamePhase,
     ending,

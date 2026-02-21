@@ -8,6 +8,7 @@ import { useCareerHandlers } from './career';
 import { useEducationHandlers } from './education';
 import { useRelationshipHandlers } from './relationship';
 import { useModalState } from '../features/modal';
+import { GAME_CONFIG } from '../config/gameConfig';
 import StatsPanel from '../components/StatsPanel';
 import EventModal from '../components/EventModal';
 import LogPanel from '../components/LogPanel';
@@ -28,6 +29,7 @@ export default function GameView() {
     logs,
     addLog,
     ageUp,
+    incrementManualTrigger,
     gamePhase,
     endingResult,
     endingEvaluation,
@@ -80,12 +82,21 @@ export default function GameView() {
   const handleTriggerEvent = useCallback(async () => {
     if (!player || isLoading) return;
 
+    // 检查手动触发次数限制
+    const currentCount = player.manualEventTriggersThisYear ?? 0;
+    const maxTriggers = GAME_CONFIG.parameters.max_manual_triggers_per_year;
+    if (currentCount >= maxTriggers) {
+      addLog('system', `今年已达到手动触发上限（${maxTriggers}次），请等待明年`);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const event = await eventHandlers.handleTriggerEvent();
       if (event) {
         setCurrentEvent(event);
         setIsEventModalOpen(true);
+        incrementManualTrigger();
       }
     } catch (error) {
       console.error('生成事件失败:', error);
@@ -93,7 +104,7 @@ export default function GameView() {
     } finally {
       setIsLoading(false);
     }
-  }, [player, isLoading, eventHandlers, addLog]);
+  }, [player, isLoading, eventHandlers, addLog, incrementManualTrigger]);
 
   // 处理选择
   const handleChoice = useCallback(
@@ -126,7 +137,7 @@ export default function GameView() {
         newAge
       );
 
-      // 更新年龄
+      // 更新年龄（包含自动升学检查）
       ageUp();
 
       // 如果有阶段转换事件，显示它
@@ -134,13 +145,21 @@ export default function GameView() {
         setCurrentEvent(stageEvent);
         setIsEventModalOpen(true);
         addLog('stage', `进入新阶段：${newStage}`);
+      } else {
+        // 没有阶段转换事件时，自动触发普通事件
+        const event = await eventHandlers.handleTriggerEvent();
+        if (event) {
+          setCurrentEvent(event);
+          setIsEventModalOpen(true);
+        }
       }
     } catch (error) {
       console.error('处理年龄增长失败:', error);
+      addLog('system', '处理年龄增长时发生错误');
     } finally {
       setIsLoading(false);
     }
-  }, [player, isLoading, ageUp, addLog]);
+  }, [player, isLoading, ageUp, addLog, eventHandlers]);
 
   // 条件返回放在所有 hooks 之后
   // 如果游戏结束，显示结局界面
@@ -186,18 +205,19 @@ export default function GameView() {
           </div>
           <div className="game-actions">
             <button
-              onClick={handleTriggerEvent}
+              onClick={handleAgeUp}
               disabled={isLoading}
               className="btn-primary"
             >
-              {isLoading ? '命运转动中...' : '触发事件'}
+              {isLoading ? '命运转动中...' : '长一岁'}
             </button>
             <button
-              onClick={handleAgeUp}
+              onClick={handleTriggerEvent}
               disabled={isLoading}
               className="btn-secondary"
+              title={`本年剩余次数：${GAME_CONFIG.parameters.max_manual_triggers_per_year - (player?.manualEventTriggersThisYear ?? 0)}`}
             >
-              年龄 +1
+              触发事件 ({GAME_CONFIG.parameters.max_manual_triggers_per_year - (player?.manualEventTriggersThisYear ?? 0)})
             </button>
             <div className="action-divider" />
             <button

@@ -25,9 +25,11 @@ export default function EducationModal({
 
   const getEducationDescription = (level: EducationLevel) => {
     const descriptions: Record<EducationLevel, string> = {
+      [EducationLevel.NONE]: '学前教育阶段，探索世界的开始',
       [EducationLevel.PRIMARY]: '基础教育阶段，学习基础知识和技能',
       [EducationLevel.MIDDLE]: '中等教育阶段，深入学习各学科',
       [EducationLevel.HIGH]: '高中教育，为大学做准备',
+      [EducationLevel.COLLEGE]: '大专教育，职业技能培养',
       [EducationLevel.BACHELOR]: '大学本科，专业教育',
       [EducationLevel.MASTER]: '研究生教育，深入专业领域',
       [EducationLevel.DOCTOR]: '博士教育，最高学历',

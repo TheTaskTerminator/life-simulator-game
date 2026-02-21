@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { Player, EducationLevel, LogEntry } from '../../types';
+import { educationService } from '../../services/educationService';
+import { EDUCATION_NAMES } from '../../constants';
 
 export interface EducationHandlerProps {
   player: Player;
@@ -14,21 +16,10 @@ export function useEducationHandlers({
 }: EducationHandlerProps) {
   /**
    * 获取可用教育水平
+   * 使用 educationService 来获取可用选项
    */
   const getAvailableEducationLevels = useCallback((): EducationLevel[] => {
-    const educationOrder = [
-      EducationLevel.PRIMARY,
-      EducationLevel.MIDDLE,
-      EducationLevel.HIGH,
-      EducationLevel.BACHELOR,
-      EducationLevel.MASTER,
-      EducationLevel.DOCTOR,
-    ];
-
-    const currentIndex = educationOrder.indexOf(player.education);
-    
-    // 返回当前及更高等级
-    return educationOrder.slice(currentIndex + 1);
+    return educationService.getAvailableEducationLevels(player);
   }, [player]);
 
   /**
@@ -36,20 +27,11 @@ export function useEducationHandlers({
    */
   const handleSelectEducation = useCallback(
     (level: EducationLevel) => {
-      const educationOrder = [
-        EducationLevel.PRIMARY,
-        EducationLevel.MIDDLE,
-        EducationLevel.HIGH,
-        EducationLevel.BACHELOR,
-        EducationLevel.MASTER,
-        EducationLevel.DOCTOR,
-      ];
+      // 使用 educationService 验证
+      const result = educationService.canUpgradeTo(player, level);
 
-      const currentIndex = educationOrder.indexOf(player.education);
-      const newIndex = educationOrder.indexOf(level);
-
-      if (newIndex <= currentIndex) {
-        addLog('system', '不能选择更低的教育水平');
+      if (!result.canUpgrade) {
+        addLog('system', result.reason || '无法选择此教育水平');
         return;
       }
 
@@ -58,7 +40,7 @@ export function useEducationHandlers({
         education: level,
       }));
 
-      addLog('system', `教育水平提升：${level}`);
+      addLog('system', `🎓 教育水平提升：${EDUCATION_NAMES[level]}`);
     },
     [player, setPlayer, addLog]
   );

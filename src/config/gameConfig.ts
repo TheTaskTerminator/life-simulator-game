@@ -14,6 +14,8 @@ export const GAME_CONFIG = {
     max_age: 100,
     // 每回合事件数
     events_per_turn: 1,
+    // 每年手动触发事件上限
+    max_manual_triggers_per_year: 3,
 
     // 属性边界
     metric_bounds: {

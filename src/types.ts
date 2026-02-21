@@ -10,10 +10,12 @@ export enum LifeStage {
 
 // 教育水平
 export enum EducationLevel {
+  NONE = 'none',                // 学前
   PRIMARY = 'primary',          // 小学
   MIDDLE = 'middle',            // 初中
   HIGH = 'high',                // 高中
-  BACHELOR = 'bachelor',        // 大学
+  COLLEGE = 'college',          // 大专
+  BACHELOR = 'bachelor',        // 本科
   MASTER = 'master',            // 研究生
   DOCTOR = 'doctor'             // 博士
 }
@@ -213,6 +215,7 @@ export interface Player {
   // 回合系统
   turn?: number;  // 当前回合
   tagCooldowns?: Record<EventType, number>;  // 标签冷却
+  manualEventTriggersThisYear?: number;  // 本年已手动触发事件次数
 
   // 元数据
   startDate: number;

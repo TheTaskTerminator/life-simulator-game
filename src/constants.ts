@@ -22,12 +22,26 @@ export const STAGE_NAMES: Record<LifeStage, string> = {
 
 // 教育水平名称
 export const EDUCATION_NAMES: Record<EducationLevel, string> = {
+  [EducationLevel.NONE]: '学前',
   [EducationLevel.PRIMARY]: '小学',
   [EducationLevel.MIDDLE]: '初中',
   [EducationLevel.HIGH]: '高中',
-  [EducationLevel.BACHELOR]: '大学',
+  [EducationLevel.COLLEGE]: '大专',
+  [EducationLevel.BACHELOR]: '本科',
   [EducationLevel.MASTER]: '研究生',
   [EducationLevel.DOCTOR]: '博士',
+};
+
+// 教育水平年龄范围
+export const EDUCATION_AGE_RANGES: Record<EducationLevel, { minAge: number; maxAge: number }> = {
+  [EducationLevel.NONE]: { minAge: 0, maxAge: 6 },
+  [EducationLevel.PRIMARY]: { minAge: 7, maxAge: 12 },
+  [EducationLevel.MIDDLE]: { minAge: 12, maxAge: 15 },
+  [EducationLevel.HIGH]: { minAge: 15, maxAge: 18 },
+  [EducationLevel.COLLEGE]: { minAge: 18, maxAge: 21 },
+  [EducationLevel.BACHELOR]: { minAge: 18, maxAge: 22 },
+  [EducationLevel.MASTER]: { minAge: 22, maxAge: 25 },
+  [EducationLevel.DOCTOR]: { minAge: 25, maxAge: 30 },
 };
 
 // 职业等级名称
