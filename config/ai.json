@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "description": "AI 模型配置文件 - 修改此文件后重新部署即可切换模型",
-  "defaultModel": "qwen-72b",
-  "defaultProvider": "siliconflow",
+  "defaultModel": "doubao-lite",
+  "defaultProvider": "custom",
   "models": [
     {
       "id": "qwen-72b",
@@ -110,6 +110,28 @@
       "model": "o1-preview",
       "apiUrl": "https://api.openai.com/v1/chat/completions",
       "description": "OpenAI O1，推理能力极强",
+      "temperature": 0.8,
+      "maxTokens": 2000,
+      "enabled": true
+    },
+    {
+      "id": "doubao-lite",
+      "name": "豆包 Lite",
+      "provider": "custom",
+      "model": "doubao-seed-1-6-lite-251015",
+      "apiUrl": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      "description": "字节豆包 seed1.6 lite 模型，性价比高",
+      "temperature": 0.8,
+      "maxTokens": 2000,
+      "enabled": true
+    },
+    {
+      "id": "seed-2-0-mini",
+      "name": "seed2.0 mini",
+      "provider": "custom",
+      "model": "doubao-seed-2-0-mini-260215",
+      "apiUrl": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      "description": "字节豆包 seed2.0 mini ",
       "temperature": 0.8,
       "maxTokens": 2000,
       "enabled": true
