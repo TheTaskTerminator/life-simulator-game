@@ -90,9 +90,14 @@ VITE_AI_MODEL_ID=gpt-4
 
 ## 📋 支持的模型 ID
 
+### 豆包模型（字节跳动）
+
+- `doubao-lite` - 豆包 seed1.6 lite（当前默认）
+- `seed-2-0-mini` - 豆包 seed2.0 mini
+
 ### SiliconFlow 模型
 
-- `qwen-72b` - Qwen 2.5 72B（默认）
+- `qwen-72b` - Qwen 2.5 72B
 - `deepseek-v3` - DeepSeek V3
 - `qwen-32b` - Qwen 2.5 32B
 - `qwen-14b` - Qwen 2.5 14B
@@ -114,9 +119,9 @@ VITE_AI_MODEL_ID=gpt-4
 {
   "id": "custom-model",
   "name": "自定义模型",
-  "provider": "siliconflow",
-  "model": "your/model-name",
-  "apiUrl": "https://api.siliconflow.cn/v1/chat/completions",
+  "provider": "custom",
+  "model": "your-model-name",
+  "apiUrl": "https://your-api-url.com/v1/chat/completions",
   "description": "模型描述",
   "temperature": 0.8,
   "maxTokens": 2000,
@@ -125,6 +130,8 @@ VITE_AI_MODEL_ID=gpt-4
 ```
 
 然后修改 `defaultModel` 为 `"custom-model"` 即可使用。
+
+> 💡 使用 `provider: "custom"` 可以接入任何兼容 OpenAI API 格式的服务（如豆包、DeepSeek 等）
 
 ## 🔒 安全提示
 
