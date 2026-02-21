@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Event, Choice, Player } from '../types';
-import { useGameState } from '../hooks/useGameState';
+import { useGameStateContext } from '../hooks/GameStateContext';
 import { useGameEffects } from '../hooks/useGameEffects';
 import { stageService } from '../services/stageService';
 import { useEventHandlers } from './event';
@@ -34,7 +34,7 @@ export default function GameView() {
     endingResult,
     endingEvaluation,
     resetGame,
-  } = useGameState();
+  } = useGameStateContext();
 
   // 所有 hooks 必须在条件返回之前调用
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);

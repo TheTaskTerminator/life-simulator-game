@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useGameState } from './hooks/useGameState';
+import { GameStateProvider, useGameStateContext } from './hooks/GameStateContext';
 import { TopicProvider, getTopic, useTexts } from './core';
 import StartScreen from './components/StartScreen';
 import ResearchStartScreen from './components/ResearchStartScreen';
 import GameView from './views/GameView';
+import ResearchGameView from './views/ResearchGameView';
 import TopicSelector from './components/TopicSelector';
 import GameEntry from './components/GameEntry';
 import { TopicPackage } from './core/types/base';
@@ -12,8 +13,8 @@ import { Player } from './types';
 // 存储选中的话题 ID
 const TOPIC_STORAGE_KEY = 'life-simulator-topic';
 
-// 游戏内容包装器 - 用于在 TopicProvider 内部访问 context
-function GameContent({
+// 游戏内容核心组件 - 在 GameStateProvider 内部使用
+function GameContentInner({
   topicPackage,
   onChangeTopic,
 }: {
@@ -29,7 +30,7 @@ function GameContent({
     hasSavedGame,
     loadSavedGame,
     addLog,
-  } = useGameState(topicPackage.config.id);
+  } = useGameStateContext();
 
   const [showGameEntry, setShowGameEntry] = useState(false);
   const [hasSave, setHasSave] = useState(false);
@@ -68,17 +69,31 @@ function GameContent({
     attributes: Player['attributes'] | Record<string, number>,
     options?: { degreeType?: string; mentorType?: string }
   ) => {
-    // 使用传入的属性或默认属性
-    const gameAttributes = attributes as Player['attributes'];
+    let gameAttributes: Player['attributes'];
+
+    // 研究模拟器：将研究属性映射到标准属性字段
+    if (topicPackage.config.id === 'research-simulator') {
+      const researchAttrs = attributes as Record<string, number>;
+      gameAttributes = {
+        health: researchAttrs.health ?? 80,
+        intelligence: researchAttrs.research_ability ?? 50,
+        charm: researchAttrs.advisor_favor ?? 50,
+        wealth: researchAttrs.finance ?? 50,
+        happiness: researchAttrs.academic_passion ?? 70,
+        stress: researchAttrs.pressure ?? 30,
+      };
+    } else {
+      gameAttributes = attributes as Player['attributes'];
+    }
+
     createNewGame(name, gameAttributes);
     setShowGameEntry(false);
-    // 添加正确的话题欢迎消息
     addLog('system', `欢迎来到${texts.gameTitle}，${name}！`);
 
-    // TODO: 如果需要，可以在这里处理 degreeType 和 mentorType
-    // 目前先记录到 player 状态中
-    console.log('Game options:', options);
-  }, [createNewGame, addLog, texts.gameTitle]);
+    if (options) {
+      console.log('Game options:', options);
+    }
+  }, [createNewGame, addLog, texts.gameTitle, topicPackage.config.id]);
 
   // 重置当前游戏
   const handleReset = useCallback(() => {
@@ -91,7 +106,11 @@ function GameContent({
     <>
       {player && gameStarted ? (
         <>
-          <GameView />
+          {topicPackage.config.id === 'research-simulator' ? (
+            <ResearchGameView />
+          ) : (
+            <GameView />
+          )}
           <div style={{ position: 'fixed', bottom: 20, right: 20, display: 'flex', gap: '10px' }}>
             <button
               onClick={handleChangeTopic}
@@ -143,6 +162,21 @@ function GameContent({
         </>
       )}
     </>
+  );
+}
+
+// 游戏内容包装器 - 提供 GameStateContext
+function GameContent({
+  topicPackage,
+  onChangeTopic,
+}: {
+  topicPackage: TopicPackage;
+  onChangeTopic: () => void;
+}) {
+  return (
+    <GameStateProvider topicId={topicPackage.config.id}>
+      <GameContentInner topicPackage={topicPackage} onChangeTopic={onChangeTopic} />
+    </GameStateProvider>
   );
 }
 
